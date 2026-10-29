@@ -1,9 +1,17 @@
 package main
 
 import (
+	"context"
 	"errors"
+	"math/rand"
 	"os"
+	"reflect"
+	"runtime"
 	"sync"
+	"time"
+
+	"github.com/disintegration/imaging"
+	_ "github.com/disintegration/imaging"
 )
 
 // TIP <p>To run your code, right-click the code and select <b>Run</b>.</p> <p>Alternatively, click
@@ -11,6 +19,67 @@ import (
 func main() {
 
 	println(tailleRepertoire("."))
+
+	srcImage, _ := imaging.Open("goblin.png")
+
+	dstImage80 := imaging.Fit(srcImage, 80, 80, imaging.NearestNeighbor)
+
+	imaging.Save(dstImage80, "goblin_80.png")
+
+	a, _ := Decoder([]byte{1, 2, 3, 4})
+	println(reflect.DeepEqual(a, Message{Type: 1, Charge: []byte{2, 3, 4}}))
+
+	ch := make(chan int)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	for range 1000 {
+		go func(c chan int) {
+			select {
+			case c <- rand.Int():
+			case <-ctx.Done():
+			}
+		}(ch)
+	}
+
+	println(runtime.NumGoroutine())
+
+	time.Sleep(2 * time.Second)
+	println(runtime.NumGoroutine())
+}
+
+type Message struct {
+	Type   byte
+	Charge []byte
+}
+
+func (m Message) Equal(other Message) bool {
+	if m.Type != other.Type {
+		return false
+	}
+	if len(m.Charge) != len(other.Charge) {
+		return false
+	}
+	for i := range m.Charge {
+		if m.Charge[i] != other.Charge[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func Decoder(donnees []byte) (Message, error) {
+	if len(donnees) < 1 {
+		return Message{}, errors.New("données trop courtes")
+	}
+
+	msg := Message{
+		Type:   donnees[0],
+		Charge: donnees[1:],
+	}
+
+	return msg, nil
 }
 
 func minmaxmoy(ints ...int) (int, int, int, error) {
@@ -33,6 +102,7 @@ func minmaxmoy(ints ...int) (int, int, int, error) {
 }
 
 func tailleRepertoire(dir string) (int64, error) {
+
 	chSomme := make(chan int64)
 	var somme int64
 	var wg sync.WaitGroup
